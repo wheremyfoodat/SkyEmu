@@ -29,6 +29,7 @@
 #include "miniz.h"
 #include "localization.h"
 #include "https.hpp"
+#include "lua_manager.h"
 
 #if defined(EMSCRIPTEN)
 #include <emscripten.h>
@@ -7339,7 +7340,9 @@ static void frame(void) {
     se_load_rom_overlay(draw_click_region);
     if(draw_click_region)igEnd();
   }
-  if(emu_state.run_mode==SB_MODE_RUN||emu_state.run_mode==SB_MODE_REWIND)gui_state.overlay_open= true; 
+  if(emu_state.run_mode==SB_MODE_RUN||emu_state.run_mode==SB_MODE_REWIND)gui_state.overlay_open= true;
+  se_lua_init();
+
   /*=== UI CODE ENDS HERE ===*/
 
   simgui_render();

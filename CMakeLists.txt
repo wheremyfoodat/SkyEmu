@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15) # Needed to set MSVC Runtime type
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "" CACHE STRING "" FORCE)
 
 if(APPLE AND (NOT IOS) AND (NOT ANDROID))
   set(MACOS 1)
@@ -23,6 +23,7 @@ set(LINK_LIBS "")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_RETRO_ACHIEVEMENTS "Enable Retro Achievements" ON)
+option(ENABLE_LUAJIT "Enable scripting with the Lua programming language" ON)
 
 option(USE_SYSTEM_CURL "Use the system's libcurl package" OFF)
 option(USE_SYSTEM_OPENSSL "Use the system's OpenSSL package" OFF)
@@ -58,6 +59,11 @@ endif()
 if(NOT ANDROID)
     set(USE_SDL 1)
     add_definitions(-DUSE_SDL=1)
+endif()
+
+# LuaJIT is currently not supported on iOS
+if(IOS)
+  set(ENABLE_LUAJIT OFF)
 endif()
 
 if (NOT EMSCRIPTEN)
@@ -145,6 +151,26 @@ if(NOT EMSCRIPTEN)
   endif()
 endif()
 
+# LuaJIT
+if(ENABLE_LUAJIT)
+    add_subdirectory(src/LuaJIT luajit)
+    include_directories(src/LuaJIT/src ${CMAKE_BINARY_DIR}/luajit)
+    include_directories(src/imgui-lua-bindings)
+    set_target_properties(luajit PROPERTIES EXCLUDE_FROM_ALL 1)
+
+    if(MSVC)
+      target_compile_definitions(libluajit PRIVATE _CRT_SECURE_NO_WARNINGS)
+      target_compile_definitions(minilua PRIVATE _CRT_SECURE_NO_WARNINGS)
+      target_compile_definitions(buildvm PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
+
+    add_definitions(-DSKYEMU_ENABLE_LUA=1)
+    set(IMGUI_LUA_BINDINGS src/imgui-lua-bindings/imgui_lua_bindings.cpp)
+    set(LUA_FILES ${IMGUI_LUA_BINDINGS} src/lua_manager.cpp)
+
+    set(LINK_LIBS ${LINK_LIBS} libluajit)
+endif()
+
 # TinyFileDialogs
 if ((NOT IOS) AND (NOT EMSCRIPTEN) AND (NOT ANDROID) AND (NOT SE_PLATFORM_LINUX) AND (NOT SE_PLATFORM_FREEBSD))
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DUSE_TINY_FILE_DIALOGS")
@@ -175,6 +201,7 @@ add_library(cimgui STATIC
     )
 set_property(TARGET cimgui PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 target_include_directories(cimgui INTERFACE src/cimgui)
+target_include_directories(cimgui INTERFACE src/cimgui/imgui)
 
 if(USE_SDL)
   if (USE_SYSTEM_SDL2)
@@ -316,6 +343,7 @@ if(ENABLE_HTTP_CONTROL_SERVER)
 endif()
 
 set(SKYEMU_SRC ${SKYEMU_SRC} src/cloud.cpp src/https.cpp src/atlas.cpp)
+set(SKYEMU_SRC ${SKYEMU_SRC} ${LUA_FILES})
 
 if(UNICODE_GUI)
   set(SKYEMU_SRC ${SKYEMU_SRC} src/utf8proc/utf8proc.c)
