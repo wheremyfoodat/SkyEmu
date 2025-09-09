@@ -7035,8 +7035,6 @@ static void frame(void) {
 
 
     if(gui_state.settings.draw_debug_menu)se_draw_debug_menu();
-    se_lua_init();
-    se_display_text_editor(lua_editor);
 
     int orig_x = igGetCursorPosX();
     int v = (gui_state.settings.volume*100);
@@ -7306,6 +7304,8 @@ static void frame(void) {
     se_update_frame();
 
     se_draw_emulated_system_screen(false);
+    se_lua_init();
+    se_display_text_editor(lua_editor);
 
 #ifdef ENABLE_RETRO_ACHIEVEMENTS
     float left = screen_x;

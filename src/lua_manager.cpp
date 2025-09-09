@@ -369,20 +369,15 @@ void LuaManager::initializeThunks() {
 void se_lua_init() {
 	const char* lua_script = R"(
     function draw_ui()
-        print("Starting the script")
         local shown = imgui.Begin("FE6 hax")
-        print("Began da window")
 
         if shown then
-            print("Showing da button")
             if imgui.SmallButton("Game Over") then
                 print("Button clicked")
             end
-            print("Showed da button")
         end
 
         imgui.End()
-        print("Finished the script")
     end
 
     draw_ui()
