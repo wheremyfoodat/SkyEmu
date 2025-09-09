@@ -380,8 +380,8 @@ void se_lua_init() {
 
         -- print("type(show) =", type(show))
         print("Showing da button")
-        --if imgui.Button("Game Over") then
-        --end
+        if imgui.Button("Game Over") then
+        end
         print("Showed da button")
 
         imgui.End()
