@@ -30,6 +30,7 @@
 #include "localization.h"
 #include "https.hpp"
 #include "lua_manager.h"
+#include "text_editor.h"
 
 #if defined(EMSCRIPTEN)
 #include <emscripten.h>
@@ -596,7 +597,7 @@ static bool se_reload_theme();
 double se_time();
 void se_push_disabled();
 void se_pop_disabled();
-
+static text_editor_t lua_editor;
 
 static int se_draw_theme_region(int region, float x, float y, float w, float h);
 static int se_draw_theme_region_tint(int region, float x, float y, float w, float h,uint32_t tint);
@@ -7034,7 +7035,8 @@ static void frame(void) {
 
 
     if(gui_state.settings.draw_debug_menu)se_draw_debug_menu();
-    
+    se_lua_init();
+    se_display_text_editor(lua_editor);
 
     int orig_x = igGetCursorPosX();
     int v = (gui_state.settings.volume*100);
@@ -7341,7 +7343,6 @@ static void frame(void) {
     if(draw_click_region)igEnd();
   }
   if(emu_state.run_mode==SB_MODE_RUN||emu_state.run_mode==SB_MODE_REWIND)gui_state.overlay_open= true;
-  se_lua_init();
 
   /*=== UI CODE ENDS HERE ===*/
 
@@ -7453,7 +7454,10 @@ static void frame(void) {
     
     igGetIO()->Fonts=atlas;
     igGetIO()->FontGlobalScale=1./se_dpi_scale();
+
+    se_set_text_editor_fonts(lua_editor);
   }
+
   sg_commit();
   int num_samples_to_push = saudio_expect()*2;
   enum{samples_to_push=128};
@@ -8668,6 +8672,8 @@ static void init(void) {
   sg_push_debug_group("LCD Shader Init");
 
   gui_state.lcd_prog = sg_make_shader(lcdprog_shader_desc(sg_query_backend()));
+  lua_editor = se_create_text_editor();
+
   /* pipeline object for imgui rendering */
   sg_pipeline_desc pip_desc={0};
   pip_desc.layout.buffers[0].stride = 16;

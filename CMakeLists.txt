@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15) # Needed to set MSVC Runtime type
-set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
 
 if(APPLE AND (NOT IOS) AND (NOT ANDROID))
   set(MACOS 1)
@@ -16,8 +16,9 @@ endif()
 
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(LINK_LIBS "")
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 # Set compile_commands.json generation for clangd on by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -28,6 +29,7 @@ option(ENABLE_LUAJIT "Enable scripting with the Lua programming language" ON)
 option(USE_SYSTEM_CURL "Use the system's libcurl package" OFF)
 option(USE_SYSTEM_OPENSSL "Use the system's OpenSSL package" OFF)
 option(USE_SYSTEM_SDL2 "Use the system's SDL2 package" OFF)
+option(USE_SYSTEM_LUAJIT "Use the system's LuaJIT package" OFF)
 
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ELIMINATE\_DUPLICATE\_FUNCTIONS=1 -s ENVIRONMENT=web -s ASSERTIONS=0 -s WASM=1 -DSE_PLATFORM_WEB --shell-file ${PROJECT_SOURCE_DIR}/src/shell.html -s USE_CLOSURE_COMPILER=0 ")
@@ -61,9 +63,13 @@ if(NOT ANDROID)
     add_definitions(-DUSE_SDL=1)
 endif()
 
-# LuaJIT is currently not supported on iOS
-if(IOS)
+# Lua is currently not supported on iOS or web
+if(IOS OR EMSCRIPTEN)
   set(ENABLE_LUAJIT OFF)
+endif()
+
+if(MACOS AND ENABLE_LUAJIT AND NOT USE_SYSTEM_LUAJIT)
+  message(ERROR "LuaJIT on MacOS requires system LuaJIT!")
 endif()
 
 if (NOT EMSCRIPTEN)
@@ -153,23 +159,43 @@ endif()
 
 # LuaJIT
 if(ENABLE_LUAJIT)
-    add_subdirectory(src/LuaJIT luajit)
-    include_directories(src/LuaJIT/src ${CMAKE_BINARY_DIR}/luajit)
-    include_directories(src/imgui-lua-bindings)
-    set_target_properties(luajit PROPERTIES EXCLUDE_FROM_ALL 1)
+    if (USE_SYSTEM_LUAJIT)
+        find_package(LuaJIT)
 
-    if(MSVC)
-      target_compile_definitions(libluajit PRIVATE _CRT_SECURE_NO_WARNINGS)
-      target_compile_definitions(minilua PRIVATE _CRT_SECURE_NO_WARNINGS)
-      target_compile_definitions(buildvm PRIVATE _CRT_SECURE_NO_WARNINGS)
+        if (LUAJIT_FOUND)
+            include_directories(LUA_INCLUDE_DIR)
+            set(LINK_LIBS ${LINK_LIBS} LUA_LIBRARIES)
+        else()
+            message(ERROR "Failed to find system LuaJIT. Either disable LuaJIT, or use the bundled LuaJIT by setting USE_SYSTEM_LUAJIT to false")
+        endif()
+    else()
+        add_subdirectory(src/LuaJIT luajit)
+        include_directories(src/LuaJIT/src ${CMAKE_BINARY_DIR}/luajit)
+        
+        set_target_properties(luajit PROPERTIES EXCLUDE_FROM_ALL 1)
+
+        if(MSVC)
+            target_compile_definitions(libluajit PRIVATE _CRT_SECURE_NO_WARNINGS)
+            target_compile_definitions(minilua PRIVATE _CRT_SECURE_NO_WARNINGS)
+            target_compile_definitions(buildvm PRIVATE _CRT_SECURE_NO_WARNINGS)
+        endif()
+
+        set(LINK_LIBS ${LINK_LIBS} libluajit)
     endif()
 
-    add_definitions(-DSKYEMU_ENABLE_LUA=1)
+    include_directories(src/imgui-lua-bindings)
+    
+    add_definitions(-DSE_ENABLE_LUA=1)
     set(IMGUI_LUA_BINDINGS src/imgui-lua-bindings/imgui_lua_bindings.cpp)
     set(LUA_FILES ${IMGUI_LUA_BINDINGS} src/lua_manager.cpp)
-
-    set(LINK_LIBS ${LINK_LIBS} libluajit)
 endif()
+
+# Zep text editor
+include_directories(src/zep/include)
+configure_file(src/zep/cmake/config_app.h.cmake ${CMAKE_BINARY_DIR}/zep_config/config_app.h)
+include_directories(${CMAKE_BINARY_DIR}/zep_config)
+add_compile_definitions(-DZEP_IMGUI=1 -DZEP_FEATURE_CPP_FILE_SYSTEM=1)
+set(LINK_LIBS ${LINK_LIBS} cimgui)
 
 # TinyFileDialogs
 if ((NOT IOS) AND (NOT EMSCRIPTEN) AND (NOT ANDROID) AND (NOT SE_PLATFORM_LINUX) AND (NOT SE_PLATFORM_FREEBSD))
@@ -343,7 +369,7 @@ if(ENABLE_HTTP_CONTROL_SERVER)
 endif()
 
 set(SKYEMU_SRC ${SKYEMU_SRC} src/cloud.cpp src/https.cpp src/atlas.cpp)
-set(SKYEMU_SRC ${SKYEMU_SRC} ${LUA_FILES})
+set(SKYEMU_SRC ${SKYEMU_SRC} ${LUA_FILES} src/text_editor.cpp)
 
 if(UNICODE_GUI)
   set(SKYEMU_SRC ${SKYEMU_SRC} src/utf8proc/utf8proc.c)
@@ -413,7 +439,7 @@ elseif(MACOS OR IOS)
     set(MACOSX_BUNDLE_LONG_VERSION_STRING ${GIT_COMMIT_HASH})
     set(MACOSX_BUNDLE_BUNDLE_VERSION ${GIT_COMMIT_HASH})
     if(MACOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version" FORCE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
     endif()
 
     set(MACOSX_BUNDLE_ICON_FILE AppIcon.icns)
