@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15) # Needed to set MSVC Runtime type
-set(CMAKE_OSX_ARCHITECTURES "" CACHE STRING "" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "" FORCE)
 
 if(APPLE AND (NOT IOS) AND (NOT ANDROID))
   set(MACOS 1)

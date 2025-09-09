@@ -36,6 +36,7 @@
 *.app
 *.apk
 build*/
+!buildvm/
 cmake-build-*/
 .DS_Store
 *_template.h
