@@ -14,7 +14,7 @@
 extern "C" {
 #include "text_editor.h"
 
-bool se_key_is_pressed(int keycode);
+bool se_key_is_just_pressed(int keycode);
 }
 
 using namespace Zep;
@@ -30,22 +30,22 @@ static float dpi_pixel_height_from_point_size(float pointSize, float pixelScaleY
 // A helper struct to init the editor and handle callbacks
 struct ZepContainerImGui : public IZepComponent, public IZepReplProvider {
 	ZepContainerImGui(const std::string& startupFilePath, const std::string& configPath)
-		: spEditor(std::make_unique<ZepEditor_ImGui>(configPath, GetPixelScale())) {
-		spEditor->RegisterCallback(this);
+		: impl(std::make_unique<ZepEditor_ImGui>(configPath, GetPixelScale())) {
+		impl->RegisterCallback(this);
 
-		ZepRegressExCommand::Register(*spEditor);
-		ZepReplExCommand::Register(*spEditor, this);
-		ZepReplEvaluateOuterCommand::Register(*spEditor, this);
-		ZepReplEvaluateInnerCommand::Register(*spEditor, this);
-		ZepReplEvaluateCommand::Register(*spEditor, this);
+		ZepRegressExCommand::Register(*impl);
+		ZepReplExCommand::Register(*impl, this);
+		ZepReplEvaluateOuterCommand::Register(*impl, this);
+		ZepReplEvaluateInnerCommand::Register(*impl, this);
+		ZepReplEvaluateCommand::Register(*impl, this);
 
-		spEditor->InitWithText("script.lua", "print(\"Hello World!\")");
-		spEditor->SetGlobalMode(Zep::ZepMode_Standard::StaticName());
+		impl->InitWithText("script.lua", "print(\"Hello World!\")");
+		impl->SetGlobalMode(Zep::ZepMode_Standard::StaticName());
 	}
 
 	void SetFont(ImFont* font) {
 		auto& io = ImGui::GetIO();
-		auto& display = static_cast<ZepDisplay_ImGui&>(spEditor->GetDisplay());
+		auto& display = static_cast<ZepDisplay_ImGui&>(impl->GetDisplay());
 
 		if (io.Fonts->Fonts.empty()) {
 			return;
@@ -71,14 +71,15 @@ struct ZepContainerImGui : public IZepComponent, public IZepReplProvider {
 	~ZepContainerImGui() {}
 
 	void Destroy() {
-		spEditor->UnRegisterCallback(this);
-		spEditor.reset();
+		impl->UnRegisterCallback(this);
+		impl.reset();
 	}
 
-	virtual ZepEditor& GetEditor() const override { return *spEditor; }
+	virtual ZepEditor& GetEditor() const override { return *impl; }
 
 	bool quit = false;
-	std::unique_ptr<ZepEditor_ImGui> spEditor;
+	bool in_focus = false;
+	std::unique_ptr<ZepEditor_ImGui> impl;
 };
 
 using ZepContainer = ZepContainerImGui;
@@ -88,38 +89,39 @@ static void se_handle_text_editor_keypresses(text_editor_t editor) {
 	auto& io = ImGui::GetIO();
 
 	if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
-		zep.spEditor->OnMouseMove(Zep::toNVec2f(io.MousePos));
+		zep.impl->OnMouseMove(Zep::toNVec2f(io.MousePos));
 	}
 
 	if (io.MouseClicked[0]) {
-		if (zep.spEditor->OnMouseDown(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Left)) {
+		if (zep.impl->OnMouseDown(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Left)) {
 			// Hide the mouse click from imgui if we handled it
 			io.MouseClicked[0] = false;
 		}
 	}
 
 	if (io.MouseClicked[1]) {
-		if (zep.spEditor->OnMouseDown(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Right)) {
+		if (zep.impl->OnMouseDown(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Right)) {
 			// Hide the mouse click from imgui if we handled it
 			io.MouseClicked[0] = false;
 		}
 	}
 
 	if (io.MouseReleased[0]) {
-		if (zep.spEditor->OnMouseUp(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Left)) {
+		if (zep.impl->OnMouseUp(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Left)) {
 			// Hide the mouse click from imgui if we handled it
 			io.MouseClicked[0] = false;
 		}
 	}
 
 	if (io.MouseReleased[1]) {
-		if (zep.spEditor->OnMouseUp(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Right)) {
+		if (zep.impl->OnMouseUp(Zep::toNVec2f(io.MousePos), Zep::ZepMouseButton::Right)) {
 			// Hide the mouse click from imgui if we handled it
 			io.MouseClicked[0] = false;
 		}
 	}
 
 	if (ImGui::IsWindowFocused()) {
+		zep.in_focus = true;
 		printf("Checking fo buttonz\n");
 		bool handled = false;
 		uint32_t mod = 0;
@@ -131,59 +133,58 @@ static void se_handle_text_editor_keypresses(text_editor_t editor) {
 			mod |= Zep::ModifierKey::Shift;
 		}
 
-		auto pWindow = zep.spEditor->GetActiveTabWindow()->GetActiveWindow();
+		auto pWindow = zep.impl->GetActiveTabWindow()->GetActiveWindow();
 		const auto& buffer = pWindow->GetBuffer();
 
-		if (se_key_is_pressed(SAPP_KEYCODE_TAB)) {
+		if (se_key_is_just_pressed(SAPP_KEYCODE_TAB)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::TAB, mod);
 			return;
 		}
-		if (se_key_is_pressed(SAPP_KEYCODE_ESCAPE)) {
+		if (se_key_is_just_pressed(SAPP_KEYCODE_ESCAPE)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::ESCAPE, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_ENTER)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_ENTER)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::RETURN, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_DELETE)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_DELETE)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::DEL, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_HOME)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_HOME)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::HOME, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_END)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_END)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::END, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_BACKSPACE)) {
-			printf("Backspace pressed\n");
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_BACKSPACE)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::BACKSPACE, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_RIGHT)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_RIGHT)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::RIGHT, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_LEFT)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_LEFT)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::LEFT, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_UP)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_UP)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::UP, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_DOWN)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_DOWN)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::DOWN, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_PAGE_DOWN)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_PAGE_DOWN)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::PAGEDOWN, mod);
 			return;
-		} else if (se_key_is_pressed(SAPP_KEYCODE_PAGE_UP)) {
+		} else if (se_key_is_just_pressed(SAPP_KEYCODE_PAGE_UP)) {
 			buffer.GetMode()->AddKeyPress(Zep::ExtKeys::PAGEUP, mod);
 			return;
 		} else if (io.KeyCtrl) {
 			for (int ch = SAPP_KEYCODE_A; ch <= SAPP_KEYCODE_Z; ch++) {
-				if (se_key_is_pressed(ch)) {
+				if (se_key_is_just_pressed(ch)) {
 					buffer.GetMode()->AddKeyPress(ch - SAPP_KEYCODE_A + 'a', mod);
 					handled = true;
 				}
 			}
 
-			if (se_key_is_pressed(SAPP_KEYCODE_SPACE)) {
+			if (se_key_is_just_pressed(SAPP_KEYCODE_SPACE)) {
 				buffer.GetMode()->AddKeyPress(' ', mod);
 				handled = true;
 			}
@@ -214,27 +215,29 @@ text_editor_t se_create_text_editor() {
 }
 
 void se_destroy_text_editor(text_editor_t editor) { delete (ZepContainer*)editor; }
+bool se_text_editor_focused(text_editor_t editor) { return ((ZepContainer*)editor)->in_focus; }
 
 void se_display_text_editor(text_editor_t editor) {
 	auto& zep = *(ZepContainer*)editor;
+	zep.in_focus = false;
 
-	ImGui::Begin("Zep");
+	if (ImGui::Begin("Zep")) {
+		auto min = ImGui::GetCursorScreenPos();
+		auto max = ImGui::GetContentRegionAvail();
+		max.x = std::max(1.0f, max.x);
+		max.y = std::max(1.0f, max.y);
 
-	auto min = ImGui::GetCursorScreenPos();
-	auto max = ImGui::GetContentRegionAvail();
-	max.x = std::max(1.0f, max.x);
-	max.y = std::max(1.0f, max.y);
+		// Fill the window
+		max.x = min.x + max.x;
+		max.y = min.y + max.y;
+		zep.impl->SetDisplayRegion(Zep::NVec2f(min.x, min.y), Zep::NVec2f(max.x, max.y));
 
-	// Fill the window
-	max.x = min.x + max.x;
-	max.y = min.y + max.y;
-	zep.spEditor->SetDisplayRegion(Zep::NVec2f(min.x, min.y), Zep::NVec2f(max.x, max.y));
+		// Handle user input
+		se_handle_text_editor_keypresses(editor);
 
-	// Handle user input
-	se_handle_text_editor_keypresses(editor);
-
-	// Display the editor inside this window
-	zep.spEditor->Display();
+		// Display the editor inside this window
+		zep.impl->Display();
+	}
 
 	ImGui::End();
 }

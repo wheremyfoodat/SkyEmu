@@ -421,6 +421,8 @@ typedef struct {
     int screen_height;
     float dpi_override;
     int button_state[SAPP_MAX_KEYCODES];
+    int newly_pressed_buttons[SAPP_MAX_KEYCODES];
+	
     struct{
       bool active;
       float pos[2];
@@ -1686,6 +1688,12 @@ bool se_key_is_pressed(int keycode){
   if(igGetIO()->WantCaptureKeyboard && ! emu_state.joy.inputs[SE_KEY_PEN_DOWN] )return false; 
   return gui_state.button_state[keycode];
 }
+
+bool se_key_is_just_pressed(int keycode){
+  if(keycode>SAPP_MAX_KEYCODES||keycode==-1)return false;
+  return gui_state.newly_pressed_buttons[keycode];
+}
+
 static sg_image* se_get_image(){
   se_deferred_image_free_t * tmp_image = (se_deferred_image_free_t*)calloc(1,sizeof(se_deferred_image_free_t));
   tmp_image->next = gui_state.image_free_list;
@@ -3226,7 +3234,6 @@ void se_set_default_keybind(gui_state_t *gui){
   gui->key.bound_id[SE_KEY_SELECT] = SAPP_KEYCODE_APOSTROPHE; 
   gui->key.bound_id[SE_KEY_FOLD_SCREEN]= SAPP_KEYCODE_B;     
   gui->key.bound_id[SE_KEY_PEN_DOWN]= SAPP_KEYCODE_V; 
-  gui->key.bound_id[SE_KEY_EMU_PAUSE]= SAPP_KEYCODE_V;
 
   gui->key.bound_id[SE_KEY_EMU_PAUSE]= SAPP_KEYCODE_SPACE;     
   gui->key.bound_id[SE_KEY_EMU_REWIND]= SAPP_KEYCODE_R;     
@@ -6960,6 +6967,7 @@ uint8_t* se_hcs_callback(const char* cmd, const char** params, uint64_t* result_
 
 static void frame(void) {
   se_reset_html_click_regions();
+
 #ifdef USE_SDL
   se_poll_sdl();
 #endif
@@ -7215,9 +7223,11 @@ static void frame(void) {
       if(emu_state.step_frames<1&&emu_state.step_frames!=-1)emu_state.step_frames=1; 
     }
 
-    if(curr->inputs[SE_KEY_EMU_PAUSE] && !prev->inputs[SE_KEY_EMU_PAUSE]){
-      if(emu_state.run_mode!=SB_MODE_RUN){emu_state.run_mode=SB_MODE_RUN;emu_state.step_frames=1;}
-      else emu_state.run_mode = SB_MODE_PAUSE;
+    if(!se_text_editor_focused(lua_editor)) {
+      if(curr->inputs[SE_KEY_EMU_PAUSE] && !prev->inputs[SE_KEY_EMU_PAUSE]){
+        if(emu_state.run_mode!=SB_MODE_RUN){emu_state.run_mode=SB_MODE_RUN;emu_state.step_frames=1;}
+        else emu_state.run_mode = SB_MODE_PAUSE;
+      }
     }
 
     igPopItemWidth();
@@ -7501,6 +7511,7 @@ static void frame(void) {
     gui_state.last_saved_settings=gui_state.settings;
   }
   atlas_upload_all();
+  memset(&gui_state.newly_pressed_buttons[0], 0, sizeof(gui_state.newly_pressed_buttons));
 }
 void se_load_settings(){
   se_load_recent_games_list();
@@ -8767,6 +8778,7 @@ static void event(const sapp_event* ev) {
     }
   }else if (ev->type == SAPP_EVENTTYPE_KEY_DOWN) {
     gui_state.button_state[ev->key_code] = true;
+    gui_state.newly_pressed_buttons[ev->key_code] = true;
     gui_state.key.last_bind_activitiy = ev->key_code; 
   }
   else if (ev->type == SAPP_EVENTTYPE_KEY_UP) {
