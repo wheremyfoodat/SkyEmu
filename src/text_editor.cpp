@@ -221,7 +221,12 @@ void se_display_text_editor(text_editor_t editor) {
 	auto& zep = *(ZepContainer*)editor;
 	zep.in_focus = false;
 
+	ImGui::SetNextWindowSize(ImVec2(600, 500), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Zep")) {
+		if (ImGui::Button("Load Script")) {
+			printf("Loaded lua script\n");
+		}
+
 		auto min = ImGui::GetCursorScreenPos();
 		auto max = ImGui::GetContentRegionAvail();
 		max.x = std::max(1.0f, max.x);
