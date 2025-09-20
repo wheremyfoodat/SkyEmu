@@ -12,6 +12,7 @@
 #include "zep/window.h"
 
 extern "C" {
+#include "lua_manager.h"
 #include "text_editor.h"
 
 bool se_key_is_just_pressed(int keycode);
@@ -122,7 +123,6 @@ static void se_handle_text_editor_keypresses(text_editor_t editor) {
 
 	if (ImGui::IsWindowFocused()) {
 		zep.in_focus = true;
-		printf("Checking fo buttonz\n");
 		bool handled = false;
 		uint32_t mod = 0;
 
@@ -194,8 +194,6 @@ static void se_handle_text_editor_keypresses(text_editor_t editor) {
 			for (int n = 0; n < io.InputQueueCharacters.Size && io.InputQueueCharacters[n]; n++) {
 				// Ignore '\r' - sometimes ImGui generates it!
 				if (io.InputQueueCharacters[n] == '\r') continue;
-
-				printf("Pressed some text button\n");
 				buffer.GetMode()->AddKeyPress(io.InputQueueCharacters[n], mod);
 			}
 		}
@@ -224,7 +222,10 @@ void se_display_text_editor(text_editor_t editor) {
 	ImGui::SetNextWindowSize(ImVec2(600, 500), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Zep")) {
 		if (ImGui::Button("Load Script")) {
-			printf("Loaded lua script\n");
+			// Fetch the script in text form and load it
+			ZepBuffer* buffer = zep.GetEditor().GetMRUBuffer();
+			const std::string text = buffer->GetBufferText(buffer->Begin(), buffer->End());
+			se_lua_load_string(text.c_str());
 		}
 
 		auto min = ImGui::GetCursorScreenPos();

@@ -7298,6 +7298,7 @@ static void frame(void) {
       screen_width = width;
       igPopStyleColor(1);
     }
+
     bool draw_click_region = emu_state.run_mode!=SB_MODE_RUN&&emu_state.run_mode!=SB_MODE_REWIND && !draw_sidebars_over_screen&& (gui_state.overlay_open||!emu_state.rom_loaded);
     gui_state.block_touchscreen = draw_sidebars_over_screen;
     // The menubar shouldn't resize the screen when it autohides as it re-layouts the controls. 
@@ -7314,8 +7315,6 @@ static void frame(void) {
     se_update_frame();
 
     se_draw_emulated_system_screen(false);
-    se_lua_init();
-    se_display_text_editor(lua_editor);
 
 #ifdef ENABLE_RETRO_ACHIEVEMENTS
     float left = screen_x;
@@ -7349,6 +7348,8 @@ static void frame(void) {
       igSetNextWindowSize((ImVec2){screen_width, height-menu_height*se_dpi_scale()}, ImGuiCond_Always);
       igBegin("##ClickRegion",&gui_state.overlay_open,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_NoResize);
     }
+    se_lua_event(LUA_EVENT_FRAME);
+    se_display_text_editor(lua_editor);
     se_load_rom_overlay(draw_click_region);
     if(draw_click_region)igEnd();
   }

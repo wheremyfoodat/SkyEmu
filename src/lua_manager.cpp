@@ -16,7 +16,7 @@ class LuaManager {
 	bool initialized = false;
 	bool haveScript = false;
 
-	void signalEventInternal(LuaEvent e);
+	void signalEventInternal(lua_event_t e);
 
   public:
 	LuaManager() {}
@@ -28,7 +28,7 @@ class LuaManager {
 	void loadString(const std::string& code);
 
 	void reset();
-	void signalEvent(LuaEvent e) {
+	void signalEvent(lua_event_t e) {
 		if (haveScript) [[unlikely]] {
 			signalEventInternal(e);
 		}
@@ -45,7 +45,7 @@ class LuaManager {
 	void loadFile(const char* path) {}
 	void loadString(const std::string& code) {}
 	void reset() {}
-	void signalEvent(LuaEvent e) {}
+	void signalEvent(lua_event_t e) {}
 };
 #endif
 
@@ -138,7 +138,7 @@ void LuaManager::loadString(const std::string& code) {
 	}
 }
 
-void LuaManager::signalEventInternal(LuaEvent e) {
+void LuaManager::signalEventInternal(lua_event_t e) {
 	lua_getglobal(L, "eventHandler");         // We want to call the event handler
 	lua_pushinteger(L, static_cast<int>(e));  // Push event type
 
@@ -329,7 +329,7 @@ void LuaManager::initializeThunks() {
 
 	// luaL_register(L, "GLOBALS", functions);
 	//  Add values for event enum
-	addIntConstant(LuaEvent::Frame, "__Frame");
+	addIntConstant(lua_event_t::LUA_EVENT_FRAME, "__Frame");
 
 	/*
 	// Add enums for 3DS keys
@@ -366,22 +366,5 @@ void LuaManager::initializeThunks() {
 }
 #endif
 
-void se_lua_init() {
-	const char* lua_script = R"(
-    function draw_ui()
-        local shown = imgui.Begin("FE6 hax")
-
-        if shown then
-            if imgui.SmallButton("Game Over") then
-                print("Button clicked")
-            end
-        end
-
-        imgui.End()
-    end
-
-    draw_ui()
-  )";
-
-	luaManager.loadString(lua_script);
-}
+void se_lua_load_string(const char* script) { luaManager.loadString(script); }
+void se_lua_event(lua_event_t event) { luaManager.signalEvent(event); }
