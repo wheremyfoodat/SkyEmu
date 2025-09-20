@@ -77,6 +77,16 @@ struct ZepContainerImGui : public IZepComponent, public IZepReplProvider {
 	}
 
 	virtual ZepEditor& GetEditor() const override { return *impl; }
+	virtual void Notify(std::shared_ptr<Zep::ZepMessage> message) override {
+		if (message->messageId == Zep::Msg::GetClipBoard) {
+			const char* clip = ImGui::GetClipboardText();
+			message->str = clip ? clip : "";
+			message->handled = true;
+		} else if (message->messageId == Zep::Msg::SetClipBoard) {
+			ImGui::SetClipboardText(message->str.c_str());
+			message->handled = true;
+		};
+	}
 
 	bool quit = false;
 	bool in_focus = false;
