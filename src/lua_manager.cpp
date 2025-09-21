@@ -288,6 +288,8 @@ static int getButtonThunk(lua_state* L) {
 
 // clang-format off
 static constexpr luaL_Reg functions[] = {
+	{ "gba_read32", se_lua_read32_thunk },
+
     /*
 	{ "__read8", read8Thunk },
 	{ "__read16", read16Thunk },
@@ -321,6 +323,9 @@ static constexpr luaL_Reg functions[] = {
 void LuaManager::initializeThunks() {
 	static const char* runtimeInit = R"(
 )";
+
+	luaL_newlib(L, functions);
+	lua_setglobal(L, "SkyEmu");
 
 	auto addIntConstant = [&](int x, const char* name) {
 		lua_pushinteger(L, x);

@@ -29,11 +29,18 @@
 #include "miniz.h"
 #include "localization.h"
 #include "https.hpp"
-#include "lua_manager.h"
 #include "text_editor.h"
 
 #if defined(EMSCRIPTEN)
 #include <emscripten.h>
+#endif
+
+#if defined(SE_ENABLE_LUA)
+#include <lauxlib.h>
+#include <lua.h>
+#include <lualib.h>
+
+#include "lua_manager.h"
 #endif
 
 #include "cloud.h"
@@ -8883,3 +8890,17 @@ sapp_desc sokol_main(int argc, char* argv[]) {
       .ios_keyboard_resizes_canvas=true
   };
 }
+
+#if defined(SE_ENABLE_LUA)
+int se_lua_read32_thunk(lua_State* L) {
+    const uint32_t addr = (uint32_t)lua_tointeger(L, 1);
+    uint32_t value;
+
+    if(emu_state.system ==SYSTEM_GBA) value = gba_read32(&core.gba, addr);
+    else if(emu_state.system ==SYSTEM_NDS) value = nds9_read32(&core.nds, addr);
+    else value = 0;
+
+    lua_pushinteger(L, value);
+    return 1;
+}
+#endif
